@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NutriTrack — Seguimiento Nutricional</title>
+  <!-- Chart.js para gráficos ligeros de historial y peso -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-base: #0b0f17;
+      --bg-card: #151c28;
+      --bg-card-hover: #1e2738;
+      --bg-input: #0f141f;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #263147;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --cal-color: #10b981;
+      --pro-color: #3b82f6;
+      --carb-color: #f59e0b;
+      --fat-color: #ec4899;
+      --radius: 14px;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 90px;
+      min-height: 100vh;
+    }
+
+    /* Cabecera y Navegación */
+    header {
+      background-color: rgba(21, 28, 40, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 14px 20px;
+    }
+
+    .header-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--cal-color);
+      box-shadow: 0 0 10px var(--cal-color);
+    }
+
+    .date-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-input);
+      padding: 4px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .date-controls button {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .date-controls button:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .date-controls input[type="date"] {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .date-controls input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      cursor: pointer;
+    }
+
+    /* Barra de pestañas */
+    .nav-tabs {
+      max-width: 960px;
+      margin: 16px auto 0;
+      padding: 0 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: var(--bg-card-hover);
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Contenedor Principal */
+    main {
+      max-width: 960px;
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+
+    .tab-view {
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .tab-view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tarjetas y Grid */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    /* Tarjetas de Progreso Nutricional */
+    .macro-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .macro-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+
+    .macro-name {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .macro-remaining {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .macro-values {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .macro-values span {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: var(--bg-input);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.3s ease;
+    }
+
+    /* Formularios e Inputs */
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 10px;
+    }
+
+    /* Botones */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #fff;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-main);
+    }
+    .btn-outline:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .btn-sm {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+
+    /* Lista de alimentos */
+    .food-list {
+      list-style: none;
+    }
+
+    .food-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .food-item:last-child {
+      border-bottom: none;
+    }
+
+    .food-info h4 {
+      font-size: 0.98rem;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .food-meta {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+    }
+
+    .food-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* Buscador y Resultados */
+    .search-results {
+      margin-top: 12px;
+      max-height: 260px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-input);
+    }
+
+    /* Avisos y Alertas */
+    .notice {
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      background: rgba(59, 130, 246, 0.08);
+      color: #bfdbfe;
+    }
+
+    .notice-warn {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fde68a;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Vista previa de foto IA */
+    .photo-preview-box {
+      margin: 12px 0;
+      text-align: center;
+    }
+
+    .photo-preview-box img {
+      max-width: 100%;
+      max-height: 240px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+    }
+
+    .chart-box {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+
+    /* Modal para editar comida */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      max-width: 460px;
+      width: 100%;
+      padding: 20px;
+    }
+
+    @media (max-width: 640px) {
+      .header-inner {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .date-controls {
+        justify-content: space-between;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CABECERA -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>NutriTrack</span>
+      </div>
+      <div class="date-controls">
+        <button type="button" id="btnPrevDay" title="Día anterior">&#8592;</button>
+        <input type="date" id="currentDateInput">
+        <button type="button" id="btnNextDay" title="Día siguiente">&#8594;</button>
+        <button type="button" id="btnToday">Hoy</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAVEGACIÓN POR PESTAÑAS -->
+  <nav class="nav-tabs">
+    <button class="tab-btn active" data-tab="tab-diario">Panel Diario</button>
+    <button class="tab-btn" data-tab="tab-ia">Foto con Gemini IA</button>
+    <button class="tab-btn" data-tab="tab-favoritos">Favoritos</button>
+    <button class="tab-btn" data-tab="tab-historial">Historial</button>
+    <button class="tab-btn" data-tab="tab-peso">Peso Corporal</button>
+    <button class="tab-btn" data-tab="tab-ajustes">Objetivos y API</button>
+  </nav>
+
+  <main>
+    <!-- ==========================================
+         1. PESTAÑA: PANEL DIARIO
+         ========================================== -->
+    <section id="tab-diario" class="tab-view active">
+      <!-- Resumen de Macros y Calorías -->
+      <div class="grid-4">
+        <div class="macro-card">
+          <div class="macro-top">
+            <span class="macro-name">Calorías</span>
+            <span class="macro-remaining" id="calRemaining">Restan: 0 kcal</span>
+          </div>
+          <div class="macro-values">
+            <strong id="calCurrent">0</strong> <span id="calGoal">/ 2500 kcal</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="calBar" style="width:0%; background: var(--cal-color);"></div>
+          </div>
+        </div>
+
+        <div class="macro-card">
+          <div class="macro-top">
+            <span class="macro-name">Proteínas</span>
+            <span class="macro-remaining" id="proRemaining">Restan: 0 g</span>
+          </div>
+          <div class="macro-values">
+            <strong id="proCurrent">0</strong> <span id="proGoal">/ 160 g</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="proBar" style="width:0%; background: var(--pro-color);"></div>
+          </div>
+        </div>
+
+        <div class="macro-card">
+          <div class="macro-top">
+            <span class="macro-name">Carbohidratos</span>
+            <span class="macro-remaining" id="carbRemaining">Restan: 0 g</span>
+          </div>
+          <div class="macro-values">
+            <strong id="carbCurrent">0</strong> <span id="carbGoal">/ 300 g</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="carbBar" style="width:0%; background: var(--carb-color);"></div>
+          </div>
+        </div>
+
+        <div class="macro-card">
+          <div class="macro-top">
+            <span class="macro-name">Grasas</span>
+            <span class="macro-remaining" id="fatRemaining">Restan: 0 g</span>
+          </div>
+          <div class="macro-values">
+            <strong id="fatCurrent">0</strong> <span id="fatGoal">/ 75 g</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="fatBar" style="width:0%; background: var(--fat-color);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Registro Manual de Alimento -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Añadir alimento manualmente</h3>
+          </div>
+          <form id="formManualFood">
+            <div class="form-group">
+              <label for="foodName">Nombre del alimento o comida</label>
+              <input type="text" id="foodName" placeholder="Ej: Pechuga de pollo, Arroz blanco..." required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="foodMode">Introducir valores</label>
+                <select id="foodMode">
+                  <option value="per100">Por cada 100 g</option>
+                  <option value="total">Totales de la ración</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="foodGrams">Cantidad (g)</label>
+                <input type="number" id="foodGrams" value="100" min="1" step="any" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="foodCal">Kcal</label>
+                <input type="number" id="foodCal" placeholder="0" min="0" step="any" required>
+              </div>
+              <div class="form-group">
+                <label for="foodPro">Proteína (g)</label>
+                <input type="number" id="foodPro" placeholder="0" min="0" step="any" required>
+              </div>
+              <div class="form-group">
+                <label for="foodCarb">Carbos (g)</label>
+                <input type="number" id="foodCarb" placeholder="0" min="0" step="any" required>
+              </div>
+              <div class="form-group">
+                <label for="foodFat">Grasas (g)</label>
+                <input type="number" id="foodFat" placeholder="0" min="0" step="any" required>
+              </div>
+            </div>
+            <div class="notice" id="calcPreview" style="margin-top:4px; margin-bottom:12px;">
+              Total a registrar: <strong>0 kcal</strong> (0g P | 0g C | 0g G)
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="submit" class="btn btn-primary">Añadir al día</button>
+              <button type="button" id="btnSaveAsFav" class="btn btn-outline">Guardar en Favoritos</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Buscador Open Food Facts -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Buscar en Open Food Facts</h3>
+          </div>
+          <p style="font-size:0.83rem; color:var(--text-muted); margin-bottom:12px;">
+            Busca productos para cargar automáticamente sus valores por cada 100 g en el formulario.
+          </p>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="offQuery" placeholder="Ej: Avena, Yogur griego, Atún...">
+            <button type="button" id="btnSearchOFF" class="btn btn-primary">Buscar</button>
+          </div>
+          <div id="offStatus" style="font-size:0.83rem; color:var(--text-muted); margin-top:8px;"></div>
+          <div id="offResults" class="search-results" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Lista de Comidas del Día -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Comidas registradas en este día</h3>
+          <span class="badge" id="dayItemsCount">0 registros</span>
+        </div>
+        <ul id="dailyFoodList" class="food-list"></ul>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         2. PESTAÑA: ANÁLISIS DE FOTOS CON GEMINI
+         ========================================== -->
+    <section id="tab-ia" class="tab-view">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Analizar fotografía de comida con Gemini</h3>
+        </div>
+        <div class="notice notice-warn">
+          <strong>Aviso importante de precisión:</strong> La identificación visual de alimentos y el cálculo de pesos a partir de una fotografía son <strong>estimaciones orientativas</strong>. Revisa y corrige siempre los gramos o valores nutricionales en la tabla inferior antes de guardarlos en tu registro diario.
+        </div>
+
+        <div class="form-row" style="align-items: end;">
+          <div class="form-group">
+            <label for="photoInput">Selecciona o toma una foto de tu plato</label>
+            <input type="file" id="photoInput" accept="image/*" style="padding:7px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; width:100%; color:var(--text-main);">
+          </div>
+          <div class="form-group">
+            <label for="photoNote">Nota opcional para ayudar a Gemini</label>
+            <input type="text" id="photoNote" placeholder="Ej: Hecho con 1 cucharada de aceite, plato llano...">
+          </div>
+        </div>
+
+        <div class="photo-preview-box" id="photoPreviewContainer" style="display:none;">
+          <img id="photoPreviewImg" alt="Vista previa de la comida">
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <button type="button" id="btnAnalyzePhoto" class="btn btn-primary">Analizar imagen con Gemini</button>
+          <span id="aiStatusText" style="font-size:0.88rem; color:var(--text-muted);"></span>
+        </div>
+      </div>
+
+      <!-- Resultados Editables de la IA -->
+      <div class="card" id="aiResultsCard" style="display:none;">
+        <div class="card-header">
+          <h3 class="card-title">Alimentos estimados (Edita las cantidades antes de guardar)</h3>
+          <button type="button" id="btnAddAllAi" class="btn btn-success btn-sm">Guardar todos en el día actual</button>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">
+          Al cambiar los gramos de cualquier fila, las calorías y macronutrientes se recalculan proporcionalmente de forma automática.
+        </p>
+        <div id="aiEditableList"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         3. PESTAÑA: COMIDAS FAVORITAS
+         ========================================== -->
+    <section id="tab-favoritos" class="tab-view">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Mis Alimentos y Comidas Favoritas</h3>
+        </div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+          Guarda aquí tus alimentos frecuentes para añadirlos con un clic indicando los gramos consumidos.
+        </p>
+        <ul id="favFoodList" class="food-list"></ul>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         4. PESTAÑA: HISTORIAL
+         ========================================== -->
+    <section id="tab-historial" class="tab-view">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Evolución de Consumo (Últimos 14 días con registros)</h3>
+        </div>
+        <div class="chart-box">
+          <canvas id="historyChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Resumen por fechas</h3>
+        </div>
+        <ul id="historyDaysList" class="food-list"></ul>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         5. PESTAÑA: PESO CORPORAL
+         ========================================== -->
+    <section id="tab-peso" class="tab-view">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Registrar Peso Corporal</h3>
+          </div>
+          <form id="formWeight">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="weightDate">Fecha</label>
+                <input type="date" id="weightDate" required>
+              </div>
+              <div class="form-group">
+                <label for="weightValue">Peso (kg)</label>
+                <input type="number" id="weightValue" placeholder="Ej: 72.4" min="20" max="350" step="0.1" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:8px;">Guardar peso</button>
+          </form>
+
+          <hr style="border:none; border-top:1px solid var(--border); margin:18px 0;">
+          <h4 style="font-size:0.9rem; margin-bottom:10px;">Historial de pesajes</h4>
+          <ul id="weightList" class="food-list" style="max-height:240px; overflow-y:auto;"></ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Gráfico de Evolución</h3>
+          </div>
+          <div class="chart-box">
+            <canvas id="weightChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         6. PESTAÑA: OBJETIVOS Y CONFIGURACIÓN API
+         ========================================== -->
+    <section id="tab-ajustes" class="tab-view">
+      <div class="grid-2">
+        <!-- Objetivos Diarios -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Objetivos Nutricionales Diarios</h3>
+          </div>
+          <form id="formGoals">
+            <div class="form-group">
+              <label for="goalCal">Calorías diarias (kcal)</label>
+              <input type="number" id="goalCal" min="500" max="10000" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="goalPro">Proteínas (g)</label>
+                <input type="number" id="goalPro" min="10" max="600" required>
+              </div>
+              <div class="form-group">
+                <label for="goalCarb">Carbohidratos (g)</label>
+                <input type="number" id="goalCarb" min="0" max="1200" required>
+              </div>
+              <div class="form-group">
+                <label for="goalFat">Grasas (g)</label>
+                <input type="number" id="goalFat" min="10" max="400" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:8px;">Guardar objetivos</button>
+          </form>
+        </div>
+
+        <!-- Configuración de Gemini API -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Configuración de Gemini API</h3>
+          </div>
+          <div class="notice notice-warn">
+            <strong>Seguridad de tu API Key:</strong> Nunca escribas tu clave directamente dentro del código fuente si vas a compartir o publicar el archivo. Aquí se guarda únicamente en el <code>localStorage</code> de tu navegador para uso personal.
+          </div>
+          <form id="formApi">
+            <div class="form-group">
+              <label for="geminiApiKey">Tu Gemini API Key (Google AI Studio)</label>
+              <input type="password" id="geminiApiKey" placeholder="AIzaSy...">
+            </div>
+            <div class="form-group">
+              <label for="geminiModel">Modelo multimodal compatible con imágenes</label>
+              <select id="geminiModel">
+                <option value="gemini-3.8-flash">gemini-3.8-flash (Recomendado actual)</option>
+                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                <option value="gemini-flash-latest">gemini-flash-latest (Alias automático)</option>
+              </select>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="submit" class="btn btn-primary">Guardar configuración</button>
+              <button type="button" id="btnClearApiKey" class="btn btn-danger">Borrar clave</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Copia de Seguridad -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Copia de Seguridad de tus Datos</h3>
+        </div>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+          Exporta tus registros a un archivo JSON o importa una copia anterior para no perder tu progreso si cambias de dispositivo.
+        </p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="button" id="btnExportData" class="btn btn-outline">Exportar datos (.json)</button>
+          <label class="btn btn-outline" style="margin:0; cursor:pointer;">
+            Importar datos (.json)
+            <input type="file" id="importDataInput" accept="application/json" style="display:none;">
+          </label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL PARA EDITAR COMIDA REGISTRADA -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="modal-content">
+      <div class="card-header">
+        <h3 class="card-title">Editar registro</h3>
+        <button type="button" id="btnCloseModal" class="btn btn-outline btn-sm">&#10005;</button>
+      </div>
+      <form id="formEditFood">
+        <input type="hidden" id="editFoodId">
+        <div class="form-group">
+          <label for="editFoodName">Nombre</label>
+          <input type="text" id="editFoodName" required>
+        </div>
+        <div class="form-group">
+          <label for="editFoodGrams">Cantidad (g) — recalcula macros proporcionalmente</label>
+          <input type="number" id="editFoodGrams" min="1" step="any" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editFoodCal">Kcal totales</label>
+            <input type="number" id="editFoodCal" min="0" step="any" required>
+          </div>
+          <div class="form-group">
+            <label for="editFoodPro">Proteína (g)</label>
+            <input type="number" id="editFoodPro" min="0" step="any" required>
+          </div>
+          <div class="form-group">
+            <label for="editFoodCarb">Carbos (g)</label>
+            <input type="number" id="editFoodCarb" min="0" step="any" required>
+          </div>
+          <div class="form-group">
+            <label for="editFoodFat">Grasas (g)</label>
+            <input type="number" id="editFoodFat" min="0" step="any" required>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+          <button type="button" id="btnCancelEdit" class="btn btn-outline">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /**************************************************************
+     * 1. ESTADO Y PERSISTENCIA EN LOCALSTORAGE (SIN DATOS FALSOS)
+     **************************************************************/
+    const STORAGE_KEY = 'nutritrack_app_v1';
+    const API_KEY_STORAGE = 'nutritrack_gemini_key';
+    const MODEL_STORAGE = 'nutritrack_gemini_model';
+
+    function getTodayISO() {
+      const d = new Date();
+      const offset = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    }
+
+    const defaultState = {
+      goals: { cal: 2500, pro: 160, carb: 300, fat: 75 },
+      logs: {},      // { "YYYY-MM-DD": [ { id, name, grams, cal, pro, carb, fat } ] }
+      favorites: [], // [ { id, name, refGrams, cal, pro, carb, fat } ]
+      weights: []    // [ { date: "YYYY-MM-DD", weight: 72.5 } ]
+    };
+
+    let state = loadState();
+    let currentDate = getTodayISO();
+    let historyChartInstance = null;
+    let weightChartInstance = null;
+    let currentPhotoBase64 = null;
+    let currentPhotoMimeType = null;
+    let aiDetectedItems = [];
+    let editingOriginalRatio = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(defaultState);
+        const parsed = JSON.parse(raw);
+        return {
+          goals: { ...defaultState.goals, ...(parsed.goals || {}) },
+          logs: parsed.logs || {},
+          favorites: Array.isArray(parsed.favorites) ? parsed.favorites : [],
+          weights: Array.isArray(parsed.weights) ? parsed.weights : []
+        };
+      } catch (e) {
+        console.error('Error al leer localStorage:', e);
+        return structuredClone(defaultState);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function round1(num) {
+      return Math.round((Number(num) || 0) * 10) / 10;
+    }
+
+    /**************************************************************
+     * 2. NAVEGACIÓN DE FECHAS Y PESTAÑAS
+     **************************************************************/
+    const currentDateInput = document.getElementById('currentDateInput');
+    currentDateInput.value = currentDate;
+
+    function setDate(newDateStr) {
+      if (!newDateStr) return;
+      currentDate = newDateStr;
+      currentDateInput.value = currentDate;
+      renderDailyPanel();
+    }
+
+    currentDateInput.addEventListener('change', (e) => setDate(e.target.value));
+
+    document.getElementById('btnPrevDay').addEventListener('click', () => {
+      const d = new Date(currentDate + 'T12:00:00');
+      d.setDate(d.getDate() - 1);
+      setDate(d.toISOString().split('T')[0]);
+    });
+
+    document.getElementById('btnNextDay').addEventListener('click', () => {
+      const d = new Date(currentDate + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      setDate(d.toISOString().split('T')[0]);
+    });
+
+    document.getElementById('btnToday').addEventListener('click', () => {
+      setDate(getTodayISO());
+    });
+
+    // Pestañas
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.getAttribute('data-tab');
+        document.getElementById(target).classList.add('active');
+
+        if (target === 'tab-historial') renderHistoryTab();
+        if (target === 'tab-peso') renderWeightTab();
+        if (target === 'tab-favoritos') renderFavoritesTab();
+      });
+    });
+
+    /**************************************************************
+     * 3. PANEL DIARIO Y CÁLCULOS NUTRICIONALES
+     **************************************************************/
+    function renderDailyPanel() {
+      const dayEntries = state.logs[currentDate] || [];
+      const totals = dayEntries.reduce((acc, item) => {
+        acc.cal += Number(item.cal) || 0;
+        acc.pro += Number(item.pro) || 0;
+        acc.carb += Number(item.carb) || 0;
+        acc.fat += Number(item.fat) || 0;
+        return acc;
+      }, { cal: 0, pro: 0, carb: 0, fat: 0 });
+
+      updateMacroCard('cal', totals.cal, state.goals.cal, 'kcal');
+      updateMacroCard('pro', totals.pro, state.goals.pro, 'g');
+      updateMacroCard('carb', totals.carb, state.goals.carb, 'g');
+      updateMacroCard('fat', totals.fat, state.goals.fat, 'g');
+
+      // Renderizar lista de comidas del día
+      const listEl = document.getElementById('dailyFoodList');
+      document.getElementById('dayItemsCount').textContent = `${dayEntries.length} ${dayEntries.length === 1 ? 'registro' : 'registros'}`;
+
+      if (dayEntries.length === 0) {
+        listEl.innerHTML = `<li class="empty-state">No hay comidas registradas en esta fecha (${currentDate}).</li>`;
+        return;
+      }
+
+      listEl.innerHTML = dayEntries.map(item => `
+        <li class="food-item">
+          <div class="food-info">
+            <h4>${escapeHTML(item.name)}</h4>
+            <div class="food-meta">
+              <span class="badge">${round1(item.grams)} g</span>
+              <span style="color:var(--cal-color); font-weight:600;">${Math.round(item.cal)} kcal</span>
+              <span>P: ${round1(item.pro)}g</span>
+              <span>C: ${round1(item.carb)}g</span>
+              <span>G: ${round1(item.fat)}g</span>
+            </div>
+          </div>
+          <div class="food-actions">
+            <button class="btn btn-outline btn-sm" onclick="openEditModal('${item.id}')">Editar</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteFoodEntry('${item.id}')">Eliminar</button>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    function updateMacroCard(prefix, current, goal, unit) {
+      const roundedCurr = prefix === 'cal' ? Math.round(current) : round1(current);
+      const diff = goal - current;
+      const pct = goal > 0 ? Math.min(100, Math.max(0, (current / goal) * 100)) : 0;
+
+      document.getElementById(`${prefix}Current`).textContent = roundedCurr;
+      document.getElementById(`${prefix}Goal`).textContent = `/ ${goal} ${unit}`;
+      document.getElementById(`${prefix}Bar`).style.width = `${pct}%`;
+
+      const remEl = document.getElementById(`${prefix}Remaining`);
+      if (diff >= 0) {
+        remEl.textContent = `Restan: ${prefix === 'cal' ? Math.round(diff) : round1(diff)} ${unit}`;
+        remEl.style.color = 'var(--text-muted)';
+      } else {
+        remEl.textContent = `Exceso: +${prefix === 'cal' ? Math.round(Math.abs(diff)) : round1(Math.abs(diff))} ${unit}`;
+        remEl.style.color = 'var(--warning)';
+      }
+    }
+
+    // Cálculo en tiempo real del formulario manual
+    const formManual = document.getElementById('formManualFood');
+    const manualInputs = ['foodMode', 'foodGrams', 'foodCal', 'foodPro', 'foodCarb', 'foodFat'];
+    manualInputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', updateManualPreview);
+    });
+
+    function getCalculatedManualValues() {
+      const mode = document.getElementById('foodMode').value;
+      const grams = parseFloat(document.getElementById('foodGrams').value) || 0;
+      const rawCal = parseFloat(document.getElementById('foodCal').value) || 0;
+      const rawPro = parseFloat(document.getElementById('foodPro').value) || 0;
+      const rawCarb = parseFloat(document.getElementById('foodCarb').value) || 0;
+      const rawFat = parseFloat(document.getElementById('foodFat').value) || 0;
+
+      const factor = mode === 'per100' ? (grams / 100) : 1;
+      return {
+        grams: round1(grams),
+        cal: round1(rawCal * factor),
+        pro: round1(rawPro * factor),
+        carb: round1(rawCarb * factor),
+        fat: round1(rawFat * factor)
+      };
+    }
+
+    function updateManualPreview() {
+      const v = getCalculatedManualValues();
+      document.getElementById('calcPreview').innerHTML =
+        `Total a registrar (${v.grams}g): <strong>${Math.round(v.cal)} kcal</strong> (${v.pro}g P | ${v.carb}g C | ${v.fat}g G)`;
+    }
+
+    formManual.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('foodName').value.trim();
+      const v = getCalculatedManualValues();
+      if (!name || v.grams <= 0) return;
+
+      addFoodToDay(currentDate, {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        name,
+        ...v
+      });
+
+      formManual.reset();
+      document.getElementById('foodGrams').value = 100;
+      updateManualPreview();
+    });
+
+    function addFoodToDay(dateStr, entry) {
+      if (!state.logs[dateStr]) state.logs[dateStr] = [];
+      state.logs[dateStr].push(entry);
+      saveState();
+      renderDailyPanel();
+    }
+
+    window.deleteFoodEntry = function(id) {
+      if (!state.logs[currentDate]) return;
+      state.logs[currentDate] = state.logs[currentDate].filter(item => item.id !== id);
+      if (state.logs[currentDate].length === 0) delete state.logs[currentDate];
+      saveState();
+      renderDailyPanel();
+    };
+
+    /**************************************************************
+     * 4. EDICIÓN DE COMIDAS REGISTRADAS
+     **************************************************************/
+    const editModal = document.getElementById('editModal');
+
+    window.openEditModal = function(id) {
+      const list = state.logs[currentDate] || [];
+      const item = list.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('editFoodId').value = item.id;
+      document.getElementById('editFoodName').value = item.name;
+      document.getElementById('editFoodGrams').value = item.grams;
+      document.getElementById('editFoodCal').value = item.cal;
+      document.getElementById('editFoodPro').value = item.pro;
+      document.getElementById('editFoodCarb').value = item.carb;
+      document.getElementById('editFoodFat').value = item.fat;
+
+      const g = item.grams > 0 ? item.grams : 100;
+      editingOriginalRatio = {
+        calPerG: item.cal / g,
+        proPerG: item.pro / g,
+        carbPerG: item.carb / g,
+        fatPerG: item.fat / g
+      };
+
+      editModal.classList.add('open');
+    };
+
+    document.getElementById('editFoodGrams').addEventListener('input', (e) => {
+      const newG = parseFloat(e.target.value) || 0;
+      if (!editingOriginalRatio || newG <= 0) return;
+      document.getElementById('editFoodCal').value = round1(editingOriginalRatio.calPerG * newG);
+      document.getElementById('editFoodPro').value = round1(editingOriginalRatio.proPerG * newG);
+      document.getElementById('editFoodCarb').value = round1(editingOriginalRatio.carbPerG * newG);
+      document.getElementById('editFoodFat').value = round1(editingOriginalRatio.fatPerG * newG);
+    });
+
+    function closeEditModal() {
+      editModal.classList.remove('open');
+      editingOriginalRatio = null;
+    }
+
+    document.getElementById('btnCloseModal').addEventListener('click', closeEditModal);
+    document.getElementById('btnCancelEdit').addEventListener('click', closeEditModal);
+
+    document.getElementById('formEditFood').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editFoodId').value;
+      const list = state.logs[currentDate] || [];
+      const idx = list.findIndex(i => i.id === id);
+      if (idx === -1) return;
+
+      list[idx] = {
+        id,
+        name: document.getElementById('editFoodName').value.trim(),
+        grams: round1(document.getElementById('editFoodGrams').value),
+        cal: round1(document.getElementById('editFoodCal').value),
+        pro: round1(document.getElementById('editFoodPro').value),
+        carb: round1(document.getElementById('editFoodCarb').value),
+        fat: round1(document.getElementById('editFoodFat').value)
+      };
+
+      saveState();
+      closeEditModal();
+      renderDailyPanel();
+    });
+
+    /**************************************************************
+     * 5. INTEGRACIÓN CON OPEN FOOD FACTS
+     **************************************************************/
+    document.getElementById('btnSearchOFF').addEventListener('click', searchOpenFoodFacts);
+    document.getElementById('offQuery').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        searchOpenFoodFacts();
+      }
+    });
+
+    async function searchOpenFoodFacts() {
+      const query = document.getElementById('offQuery').value.trim();
+      const statusEl = document.getElementById('offStatus');
+      const resultsEl = document.getElementById('offResults');
+
+      if (!query) return;
+      statusEl.textContent = 'Buscando en Open Food Facts...';
+      resultsEl.style.display = 'none';
+      resultsEl.innerHTML = '';
+
+      try {
+        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,brands,nutriments`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Respuesta de red no válida');
+        const data = await res.json();
+
+        const products = (data.products || []).filter(p => p.product_name && p.nutriments);
+        if (products.length === 0) {
+          statusEl.textContent = 'No se encontraron productos con ese nombre.';
+          return;
+        }
+
+        statusEl.textContent = `Se encontraron ${products.length} resultados (valores por 100g):`;
+        resultsEl.style.display = 'block';
+
+        resultsEl.innerHTML = products.map((p, idx) => {
+          const n = p.nutriments;
+          const kcal = round1(n['energy-kcal_100g'] ?? (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0));
+          const pro = round1(n['proteins_100g'] || 0);
+          const carb = round1(n['carbohydrates_100g'] || 0);
+          const fat = round1(n['fat_100g'] || 0);
+          const fullName = p.brands ? `${p.product_name} (${p.brands.split(',')[0]})` : p.product_name;
+
+          return `
+            <div class="food-item" style="padding:10px;">
+              <div class="food-info">
+                <h4 style="font-size:0.9rem;">${escapeHTML(fullName)}</h4>
+                <div class="food-meta">
+                  <span>100g: <strong>${kcal} kcal</strong></span>
+                  <span>P: ${pro}g</span>
+                  <span>C: ${carb}g</span>
+                  <span>G: ${fat}g</span>
+                </div>
+              </div>
+              <button type="button" class="btn btn-outline btn-sm"
+                onclick='loadOFFIntoForm(${JSON.stringify(fullName)}, ${kcal}, ${pro}, ${carb}, ${fat})'>
+                Usar
+              </button>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'No se pudo conectar con Open Food Facts. Comprueba tu conexión.';
+      }
+    }
+
+    window.loadOFFIntoForm = function(name, cal, pro, carb, fat) {
+      document.getElementById('foodName').value = name;
+      document.getElementById('foodMode').value = 'per100';
+      document.getElementById('foodGrams').value = 100;
+      document.getElementById('foodCal').value = cal;
+      document.getElementById('foodPro').value = pro;
+      document.getElementById('foodCarb').value = carb;
+      document.getElementById('foodFat').value = fat;
+      updateManualPreview();
+      document.getElementById('foodGrams').focus();
+    };
+
+    /**************************************************************
+     * 6. COMIDAS FAVORITAS
+     **************************************************************/
+    document.getElementById('btnSaveAsFav').addEventListener('click', () => {
+      const name = document.getElementById('foodName').value.trim();
+      const v = getCalculatedManualValues();
+      if (!name || v.grams <= 0) {
+        alert('Introduce el nombre del alimento y sus valores antes de guardarlo en Favoritos.');
+        return;
+      }
+
+      state.favorites.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        name,
+        refGrams: v.grams,
+        cal: v.cal,
+        pro: v.pro,
+        carb: v.carb,
+        fat: v.fat
+      });
+      saveState();
+      alert(`"${name}" se ha guardado en tus comidas favoritas.`);
+    });
+
+    function renderFavoritesTab() {
+      const listEl = document.getElementById('favFoodList');
+      if (state.favorites.length === 0) {
+        listEl.innerHTML = `<li class="empty-state">Aún no tienes comidas favoritas guardadas. Puedes añadirlas desde el formulario del Panel Diario.</li>`;
+        return;
+      }
+
+      listEl.innerHTML = state.favorites.map(fav => `
+        <li class="food-item">
+          <div class="food-info">
+            <h4>${escapeHTML(fav.name)}</h4>
+            <div class="food-meta">
+              <span class="badge">Base: ${fav.refGrams} g</span>
+              <span style="color:var(--cal-color); font-weight:600;">${Math.round(fav.cal)} kcal</span>
+              <span>P: ${fav.pro}g</span>
+              <span>C: ${fav.carb}g</span>
+              <span>G: ${fav.fat}g</span>
+            </div>
+          </div>
+          <div class="food-actions" style="align-items:center;">
+            <input type="number" id="favGrams_${fav.id}" value="${fav.refGrams}" min="1" step="any" style="width:85px; padding:6px 8px;">
+            <span style="font-size:0.8rem; color:var(--text-muted);">g</span>
+            <button class="btn btn-primary btn-sm" onclick="addFavToCurrentDay('${fav.id}')">+ Añadir hoy</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteFavorite('${fav.id}')">&#10005;</button>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    window.addFavToCurrentDay = function(id) {
+      const fav = state.favorites.find(f => f.id === id);
+      if (!fav) return;
+      const gramsInput = document.getElementById(`favGrams_${id}`);
+      const grams = parseFloat(gramsInput ? gramsInput.value : fav.refGrams) || fav.refGrams;
+      const ratio = grams / (fav.refGrams || 100);
+
+      addFoodToDay(currentDate, {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        name: fav.name,
+        grams: round1(grams),
+        cal: round1(fav.cal * ratio),
+        pro: round1(fav.pro * ratio),
+        carb: round1(fav.carb * ratio),
+        fat: round1(fav.fat * ratio)
+      });
+
+      alert(`Añadido: ${grams}g de ${fav.name} al día ${currentDate}.`);
+    };
+
+    window.deleteFavorite = function(id) {
+      state.favorites = state.favorites.filter(f => f.id !== id);
+      saveState();
+      renderFavoritesTab();
+    };
+
+    /**************************************************************
+     * 7. ANÁLISIS DE FOTOS CON GEMINI API (MULTIMODAL + JSON SCHEMA)
+     **************************************************************/
+    const photoInput = document.getElementById('photoInput');
+    photoInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const dataUrl = evt.target.result;
+        currentPhotoMimeType = file.type || 'image/jpeg';
+        currentPhotoBase64 = dataUrl.split(',')[1];
+        const previewImg = document.getElementById('photoPreviewImg');
+        previewImg.src = dataUrl;
+        document.getElementById('photoPreviewContainer').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btnAnalyzePhoto').addEventListener('click', analyzeFoodPhotoWithGemini);
+
+    async function analyzeFoodPhotoWithGemini() {
+      const apiKey = localStorage.getItem(API_KEY_STORAGE);
+      const model = localStorage.getItem(MODEL_STORAGE) || 'gemini-3.8-flash';
+      const statusEl = document.getElementById('aiStatusText');
+      const note = document.getElementById('photoNote').value.trim();
+
+      if (!apiKey) {
+        statusEl.textContent = 'Falta tu API Key. Configúrala primero en la pestaña "Objetivos y API".';
+        statusEl.style.color = 'var(--warning)';
+        return;
+      }
+
+      if (!currentPhotoBase64) {
+        statusEl.textContent = 'Por favor, selecciona primero una fotografía.';
+        statusEl.style.color = 'var(--warning)';
+        return;
+      }
+
+      statusEl.textContent = `Analizando imagen con ${model}...`;
+      statusEl.style.color = 'var(--text-muted)';
+      document.getElementById('btnAnalyzePhoto').disabled = true;
+
+      const promptText = `Analiza esta fotografía de comida e identifica cada uno de los alimentos visibles.
+Para cada alimento, proporciona una ESTIMACIÓN orientativa de su peso en gramos y sus valores nutricionales correspondientes a esa cantidad estimada (calorías, proteínas, carbohidratos y grasas en gramos).
+${note ? 'Contexto adicional proporcionado por el usuario: ' + note : ''}
+Responde estrictamente en español siguiendo el esquema JSON indicado.`;
+
+      const payload = {
+        contents: [{
+          parts: [
+            { text: promptText },
+            {
+              inline_data: {
+                mime_type: currentPhotoMimeType,
+                data: currentPhotoBase64
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              items: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    name: { type: "STRING", description: "Nombre del alimento en español" },
+                    estimated_grams: { type: "NUMBER", description: "Cantidad estimada en gramos" },
+                    calories: { type: "NUMBER", description: "Calorías estimadas para esa cantidad" },
+                    protein_g: { type: "NUMBER", description: "Proteínas en gramos para esa cantidad" },
+                    carbs_g: { type: "NUMBER", description: "Carbohidratos en gramos para esa cantidad" },
+                    fat_g: { type: "NUMBER", description: "Grasas en gramos para esa cantidad" }
+                  },
+                  required: ["name", "estimated_grams", "calories", "protein_g", "carbs_g", "fat_g"]
+                }
+              }
+            },
+            required: ["items"]
+          }
+        }
+      };
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          const msg = data?.error?.message || 'Error al llamar a la API de Gemini';
+          throw new Error(msg);
+        }
+
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) throw new Error('Respuesta vacía del modelo.');
+
+        const parsed = JSON.parse(rawText);
+        const items = parsed.items || [];
+
+        aiDetectedItems = items.map(item => {
+          const g = item.estimated_grams > 0 ? item.estimated_grams : 100;
+          return {
+            name: item.name,
+            grams: round1(g),
+            cal: round1(item.calories),
+            pro: round1(item.protein_g),
+            carb: round1(item.carbs_g),
+            fat: round1(item.fat_g),
+            calPerG: item.calories / g,
+            proPerG: item.protein_g / g,
+            carbPerG: item.carbs_g / g,
+            fatPerG: item.fat_g / g
+          };
+        });
+
+        renderAiEditableList();
+        statusEl.textContent = 'Estimación completada. Revisa y ajusta las cantidades abajo.';
+        statusEl.style.color = 'var(--success)';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.style.color = 'var(--danger)';
+      } finally {
+        document.getElementById('btnAnalyzePhoto').disabled = false;
+      }
+    }
+
+    function renderAiEditableList() {
+      const card = document.getElementById('aiResultsCard');
+      const container = document.getElementById('aiEditableList');
+
+      if (aiDetectedItems.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+
+      card.style.display = 'block';
+      container.innerHTML = aiDetectedItems.map((item, idx) => `
+        <div class="food-item" style="align-items:flex-end;">
+          <div style="flex:2; min-width:160px;">
+            <label>Alimento estimado</label>
+            <input type="text" value="${escapeHTML(item.name)}" onchange="updateAiItemField(${idx}, 'name', this.value)">
+          </div>
+          <div style="flex:1; min-width:90px;">
+            <label>Gramos (est.)</label>
+            <input type="number" value="${item.grams}" min="1" step="any" oninput="updateAiItemGrams(${idx}, this.value)">
+          </div>
+          <div style="flex:1; min-width:85px;">
+            <label>Kcal</label>
+            <input type="number" id="aiCal_${idx}" value="${item.cal}" min="0" step="any" onchange="updateAiItemField(${idx}, 'cal', this.value)">
+          </div>
+          <div style="flex:1; min-width:75px;">
+            <label>Prot (g)</label>
+            <input type="number" id="aiPro_${idx}" value="${item.pro}" min="0" step="any" onchange="updateAiItemField(${idx}, 'pro', this.value)">
+          </div>
+          <div style="flex:1; min-width:75px;">
+            <label>Carb (g)</label>
+            <input type="number" id="aiCarb_${idx}" value="${item.carb}" min="0" step="any" onchange="updateAiItemField(${idx}, 'carb', this.value)">
+          </div>
+          <div style="flex:1; min-width:75px;">
+            <label>Grasa (g)</label>
+            <input type="number" id="aiFat_${idx}" value="${item.fat}" min="0" step="any" onchange="updateAiItemField(${idx}, 'fat', this.value)">
+          </div>
+          <div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeAiItem(${idx})" style="height:38px;">Quitar</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.updateAiItemGrams = function(idx, newGramsVal) {
+      const g = parseFloat(newGramsVal) || 0;
+      const item = aiDetectedItems[idx];
+      if (!item || g <= 0) return;
+
+      item.grams = round1(g);
+      item.cal = round1(item.calPerG * g);
+      item.pro = round1(item.proPerG * g);
+      item.carb = round1(item.carbPerG * g);
+      item.fat = round1(item.fatPerG * g);
+
+      document.getElementById(`aiCal_${idx}`).value = item.cal;
+      document.getElementById(`aiPro_${idx}`).value = item.pro;
+      document.getElementById(`aiCarb_${idx}`).value = item.carb;
+      document.getElementById(`aiFat_${idx}`).value = item.fat;
+    };
+
+    window.updateAiItemField = function(idx, field, val) {
+      if (!aiDetectedItems[idx]) return;
+      aiDetectedItems[idx][field] = field === 'name' ? val : round1(val);
+    };
+
+    window.removeAiItem = function(idx) {
+      aiDetectedItems.splice(idx, 1);
+      renderAiEditableList();
+    };
+
+    document.getElementById('btnAddAllAi').addEventListener('click', () => {
+      if (aiDetectedItems.length === 0) return;
+      aiDetectedItems.forEach(item => {
+        addFoodToDay(currentDate, {
+          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+          name: `${item.name} (Est. IA)`,
+          grams: item.grams,
+          cal: item.cal,
+          pro: item.pro,
+          carb: item.carb,
+          fat: item.fat
+        });
+      });
+
+      aiDetectedItems = [];
+      renderAiEditableList();
+      document.querySelector('[data-tab="tab-diario"]').click();
+    });
+
+    /**************************************************************
+     * 8. HISTORIAL Y GRÁFICO DE CONSUMO DIARIO
+     **************************************************************/
+    function renderHistoryTab() {
+      const dates = Object.keys(state.logs).sort();
+      const listEl = document.getElementById('historyDaysList');
+
+      if (dates.length === 0) {
+        listEl.innerHTML = `<li class="empty-state">Todavía no hay días registrados en el historial.</li>`;
+      } else {
+        listEl.innerHTML = [...dates].reverse().map(dateStr => {
+          const entries = state.logs[dateStr] || [];
+          const t = entries.reduce((acc, i) => {
+            acc.cal += i.cal; acc.pro += i.pro; acc.carb += i.carb; acc.fat += i.fat;
+            return acc;
+          }, { cal: 0, pro: 0, carb: 0, fat: 0 });
+
+          return `
+            <li class="food-item">
+              <div class="food-info">
+                <h4>${dateStr}</h4>
+                <div class="food-meta">
+                  <span style="color:var(--cal-color); font-weight:600;">${Math.round(t.cal)} kcal</span>
+                  <span>Proteína: ${round1(t.pro)}g</span>
+                  <span>Carbos: ${round1(t.carb)}g</span>
+                  <span>Grasas: ${round1(t.fat)}g</span>
+                </div>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="jumpToDate('${dateStr}')">Ver día</button>
+            </li>
+          `;
+        }).join('');
+      }
+
+      const last14 = dates.slice(-14);
+      const labels = last14;
+      const calData = last14.map(d => Math.round((state.logs[d] || []).reduce((sum, i) => sum + i.cal, 0)));
+      const goalLine = last14.map(() => state.goals.cal);
+
+      const ctx = document.getElementById('historyChart').getContext('2d');
+      if (historyChartInstance) historyChartInstance.destroy();
+
+      historyChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Kcal consumidas',
+              data: calData,
+              backgroundColor: 'rgba(16, 185, 129, 0.7)',
+              borderColor: '#10b981',
+              borderWidth: 1,
+              borderRadius: 6
+            },
+            {
+              label: 'Objetivo diario',
+              data: goalLine,
+              type: 'line',
+              borderColor: '#3b82f6',
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#f1f5f9' } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e2738' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e2738' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    window.jumpToDate = function(dateStr) {
+      setDate(dateStr);
+      document.querySelector('[data-tab="tab-diario"]').click();
+    };
+
+    /**************************************************************
+     * 9. PESO CORPORAL Y GRÁFICO DE EVOLUCIÓN
+     **************************************************************/
+    document.getElementById('weightDate').value = getTodayISO();
+
+    document.getElementById('formWeight').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = document.getElementById('weightDate').value;
+      const weight = parseFloat(document.getElementById('weightValue').value);
+      if (!date || isNaN(weight) || weight <= 0) return;
+
+      const existingIdx = state.weights.findIndex(w => w.date === date);
+      if (existingIdx >= 0) {
+        state.weights[existingIdx].weight = round1(weight);
+      } else {
+        state.weights.push({ date, weight: round1(weight) });
+      }
+
+      state.weights.sort((a, b) => a.date.localeCompare(b.date));
+      saveState();
+      document.getElementById('weightValue').value = '';
+      renderWeightTab();
+    });
+
+    function renderWeightTab() {
+      const listEl = document.getElementById('weightList');
+      if (state.weights.length === 0) {
+        listEl.innerHTML = `<li class="empty-state">Sin registros de peso todavía.</li>`;
+      } else {
+        listEl.innerHTML = [...state.weights].reverse().map(w => `
+          <li class="food-item" style="padding:8px 4px;">
+            <div>
+              <strong>${w.weight} kg</strong>
+              <span style="color:var(--text-muted); font-size:0.83rem; margin-left:8px;">${w.date}</span>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteWeight('${w.date}')">&#10005;</button>
+          </li>
+        `).join('');
+      }
+
+      const ctx = document.getElementById('weightChart').getContext('2d');
+      if (weightChartInstance) weightChartInstance.destroy();
+
+      weightChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: state.weights.map(w => w.date),
+          datasets: [{
+            label: 'Peso corporal (kg)',
+            data: state.weights.map(w => w.weight),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            tension: 0.25,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: '#3b82f6'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#f1f5f9' } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e2738' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e2738' } }
+          }
+        }
+      });
+    }
+
+    window.deleteWeight = function(dateStr) {
+      state.weights = state.weights.filter(w => w.date !== dateStr);
+      saveState();
+      renderWeightTab();
+    };
+
+    /**************************************************************
+     * 10. OBJETIVOS, API KEY Y COPIA DE SEGURIDAD
+     **************************************************************/
+    function initSettingsForms() {
+      document.getElementById('goalCal').value = state.goals.cal;
+      document.getElementById('goalPro').value = state.goals.pro;
+      document.getElementById('goalCarb').value = state.goals.carb;
+      document.getElementById('goalFat').value = state.goals.fat;
+
+      document.getElementById('geminiApiKey').value = localStorage.getItem(API_KEY_STORAGE) || '';
+      const savedModel = localStorage.getItem(MODEL_STORAGE);
+      if (savedModel) document.getElementById('geminiModel').value = savedModel;
+    }
+
+    document.getElementById('formGoals').addEventListener('submit', (e) => {
+      e.preventDefault();
+      state.goals = {
+        cal: Math.round(Number(document.getElementById('goalCal').value) || 2500),
+        pro: Math.round(Number(document.getElementById('goalPro').value) || 160),
+        carb: Math.round(Number(document.getElementById('goalCarb').value) || 300),
+        fat: Math.round(Number(document.getElementById('goalFat').value) || 75)
+      };
+      saveState();
+      renderDailyPanel();
+      alert('Objetivos diarios actualizados.');
+    });
+
+    document.getElementById('formApi').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const key = document.getElementById('geminiApiKey').value.trim();
+      const model = document.getElementById('geminiModel').value;
+      if (key) localStorage.setItem(API_KEY_STORAGE, key);
+      localStorage.setItem(MODEL_STORAGE, model);
+      alert('Configuración de Gemini guardada en este navegador.');
+    });
+
+    document.getElementById('btnClearApiKey').addEventListener('click', () => {
+      localStorage.removeItem(API_KEY_STORAGE);
+      document.getElementById('geminiApiKey').value = '';
+      alert('API Key eliminada de este navegador.');
+    });
+
+    // Exportar / Importar JSON
+    document.getElementById('btnExportData').addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute("href", dataStr);
+      a.setAttribute("download", `nutritrack_backup_${getTodayISO()}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+
+    document.getElementById('importDataInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const imported = JSON.parse(evt.target.result);
+          if (!imported.goals || !imported.logs) throw new Error('Formato de archivo no válido.');
+          state = imported;
+          saveState();
+          initSettingsForms();
+          renderDailyPanel();
+          alert('Datos importados correctamente.');
+        } catch (err) {
+          alert('Error al importar el archivo JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    // Inicialización al cargar la página
+    initSettingsForms();
+    updateManualPreview();
+    renderDailyPanel();
+  </script>
+</body>
+</html>
